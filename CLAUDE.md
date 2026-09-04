@@ -32,6 +32,10 @@ Skills（`.claude/skills/`配下のSKILL.md）は、再利用可能な具体的�
 
 サブエージェント（Planner/Researcher/Developer/Reviewer）実行中のみ、`subagentStatusLine`（`.claude/settings.json`）により、専門用語を使わない日本語でエージェントパネルに進捗を表示する。通常のチャット中は表示されず、LLM呼び出しも行わない。詳細はdocs/status-line.mdを参照。
 
+## ⚠️ 絶対ルール
+
+- **日付文字列（`YYYY-MM-DD`等）を`<`/`>`だけで比較するsort comparatorを書かない**。同値のとき0を返さないcomparatorは、同日に複数レコードがある場合の並び順を不定にする。`(a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0`のように同値で0を返すか、タイムスタンプ等の一意なキーで比較すること（敵対的レビューでsrc/engine/progression.tsとsrc/screens/HomeScreen.tsxの2箇所で同一パターンのCONFIRMED指摘、2026-09-04）。
+
 ## 参照ドキュメント
 
 - REVIEW.md: レビュー方針（敵対的検証）。reviewer Agentが従う

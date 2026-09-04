@@ -1,25 +1,34 @@
-# project001
+# TRAINING
 
-Claude CodeによるAI開発OS。新規アプリ開発に共通する開発方針・タスク管理・レビュー手順をテンプレートとして提供する。
+個人利用を前提とした、筋力増強・筋肥大に特化したパーソナライズ型トレーニングアプリ。React Native（Expo）でiOS/Android両対応。データは端末内のみに保存し、クラウド同期は行わない。
+
+このリポジトリはAI開発OSテンプレート（project001）から作成したアプリ専用リポジトリであり、開発方針・タスク管理・レビュー手順は引き続きAGENTS.md/REVIEW.md/docs/配下に従う。
 
 ## セットアップ
 
 1. `git clone`等でこのリポジトリを取得する。
-2. （任意）`bash .claude/bootstrap.sh`を実行し、Optional Dependency（Agent-Reach/Code Review Graph/Context7/GitHub CLI等）の導入状況を確認する。インストールは行わず案内のみを表示するため、実行しなくてもproject001は完全に動作する。
+2. （任意）`bash .claude/bootstrap.sh`を実行し、Optional Dependency（Agent-Reach/Code Review Graph/Context7/GitHub CLI等）の導入状況を確認する。インストールは行わず案内のみを表示する。
 3. AGENTS.mdの開発フロー（User → Manager → Planner → Developer → Reviewer → Manager → Complete）に従って進める。
 
-## 使い方
+## アプリの起動
 
-新規アプリを開発する場合、このリポジトリをコピーして雛形として使う。個別アプリの仕様・実装コードはproject001自体には追加しない。以降はAGENTS.mdの開発フローに従って進める。
+```
+npm install
+npm run start   # Expo Devツールを起動（Expo Goアプリで実機確認、またはi/aでシミュレータ）
+npm run typecheck  # tsc --noEmit
+```
 
-### 新規プロジェクトでの初期化
+Expo SDK 57 / React Native / TypeScript。ナビゲーションライブラリは使わず、`src/state/AppState.tsx`の単一状態遷移で画面を切り替える（D-005参照）。永続化はAsyncStorageのみ（クラウド同期なし、D-004参照）。
 
-`/init-project`コマンド（`.claude/commands/init-project.md`）を実行するか、以下の手順を直接行う。コピー直後にこの手順を行わないと、新規プロジェクトのSessionStart Hookがproject001自身の構築履歴を表示し続けてしまう。docs/のうちtasks.md/progress.md/decisions.mdの3つのみをリセットする。
+- `App.tsx`: フォント読み込み・画面切り替え・下部ナビ・設定シートのルート
+- `src/theme/`: カラー・フォント・アニメーション秒数などのデザイントークン
+- `src/data/`: プロフィール/種目プール/科学的数値基準の型とデータ（docs/training-science.md準拠）
+- `src/engine/`: プログラム自動生成・記録ベース自動更新・オーバーワーク判定・レスト通知のロジック
+- `src/storage/`: AsyncStorageリポジトリ、PIN・生体認証
+- `src/state/AppState.tsx`: グローバル状態（画面遷移・ワークアウトセッション進行）
+- `src/screens/`: PIN・ホーム・カテゴリ選択・ワークアウト実行・コンプリート・カレンダーの各画面とUIコンポーネント
 
-- `docs/tasks.md`: 「## タスク一覧」表のヘッダ行と区切り行は残し、`T-xxx`の行をすべて削除する。「## バックログ」の既存項目もすべて削除する。列構成は変えない（SessionStart Hookが状態列の値でフィルタするため）。
-- `docs/progress.md`: 「## 記録フォーマット」直後の`---`（この行を含む）より下をすべて削除する。
-- `docs/decisions.md`: 同様に`---`（この行を含む）より下のD-xxxをすべて削除する。
-- `README.md`: プロジェクト名・概要を書き換える。本節「### 新規プロジェクトでの初期化」自体は削除してよい。
+デザイン出典は`docs/decisions.md`（旧Claude Design成果物の`Training App プロトタイプ.dc.html`）。設計上の簡略化・逸脱はD-003〜D-007を参照。
 
 ## 構成
 
