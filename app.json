@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "TRAINING",
+    "slug": "training-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#05060A",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.nagamaki0311.training",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "PINの代わりに顔認証でアプリを開けるようにします。"
+      }
+    },
+    "android": {
+      "package": "com.nagamaki0311.training",
+      "adaptiveIcon": {
+        "backgroundColor": "#05060A",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "PINの代わりに顔認証でアプリを開けるようにします。"
+        }
+      ],
+      "expo-notifications"
+    ]
+  }
+}
