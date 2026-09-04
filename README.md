@@ -30,6 +30,17 @@ Expo SDK 57 / React Native / TypeScript。ナビゲーションライブラリ�
 
 デザイン出典は`docs/decisions.md`（旧Claude Design成果物の`Training App プロトタイプ.dc.html`）。設計上の簡略化・逸脱はD-003〜D-007を参照。
 
+## APK/IPAのビルド（EAS Build）
+
+`eas.json`にビルドプロファイルを用意済み。クラウドビルド（[EAS Build](https://docs.expo.dev/build/introduction/)）はExpoアカウントでの認証が必要なため、ローカル環境（または各自のCIアカウント）から実行する。
+
+```
+npx eas login                 # 初回のみ。Expoアカウントでログイン（無ければ無料で作成できる）
+npx eas build --platform android --profile preview   # APKを直接ビルド（内部配布向け）
+```
+
+初回実行時、EASプロジェクトとの紐付け（`app.json`の`extra.eas.projectId`）を対話式で作成するか聞かれる。ビルド完了後、Expo側がAPKのダウンロードリンクを発行する。`production`プロファイルはPlay Store提出向け（AAB形式、`autoIncrement`でバージョン自動採番）。ビルド不要ですぐ実機確認したい場合は`npm run start`でExpo Devサーバを起動し、Expo Goアプリでスキャンする。
+
 ## 構成
 
 - AGENTS.md
