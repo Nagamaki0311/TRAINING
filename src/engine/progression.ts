@@ -72,11 +72,19 @@ export function applyDeload(exercises: PlannedExercise[]): PlannedExercise[] {
   }));
 }
 
+/**
+ * セッションを新しい順に並べる比較関数。同日に複数セッションがあり得る（追加で行う）ため、
+ * 同日はid（Date.now()由来の数値文字列）の降順で決める。
+ */
+export function byNewest(a: SessionRecord, b: SessionRecord): number {
+  return a.date < b.date ? 1 : a.date > b.date ? -1 : Number(b.id) - Number(a.id);
+}
+
 /** 種目単位で直近セッションの「全セット達成したか」を新しい順に抽出する。 */
 export function fullHitHistoryFor(exerciseId: string, sessions: SessionRecord[]): boolean[] {
   return sessions
     .slice()
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    .sort(byNewest)
     .map((s) => {
       const sets = s.sets.filter((r) => r.exerciseId === exerciseId);
       if (!sets.length) return null;

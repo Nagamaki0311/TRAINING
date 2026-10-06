@@ -5,7 +5,7 @@ import { categoryOf } from '../data/exercisePool';
 import { exerciseDef, planForToday, todayIso, useAppState } from '../state/AppState';
 import { computeTodayCapacity } from '../engine/capacity';
 import { estimatePlanSeconds } from '../engine/programGenerator';
-import { shouldSuggestDeload } from '../engine/progression';
+import { byNewest, shouldSuggestDeload } from '../engine/progression';
 import { CapacityGauge } from './components/CapacityGauge';
 
 export function HomeScreen() {
@@ -42,10 +42,7 @@ export function HomeScreen() {
     fatigueLast3: state.sessions.slice(-3).map((s) => s.fatigue).filter((v): v is number => v !== null),
   });
 
-  const recent = state.sessions
-    .slice()
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-    .slice(0, 3);
+  const recent = state.sessions.slice().sort(byNewest).slice(0, 3);
 
   return (
     <ScrollView style={styles.wrap} contentContainerStyle={{ paddingBottom: 24 }}>
@@ -100,9 +97,13 @@ export function HomeScreen() {
           <Toggle label="睡眠不足" active={state.preSleepPoor} onPress={actions.togglePreSleep} />
           <Toggle label="体調不良" active={state.preUnwell} onPress={actions.togglePreUnwell} />
         </View>
-        <Pressable style={[styles.startBtn, { backgroundColor: colors.teal }]} onPress={actions.startWorkout}>
-          <Text style={styles.startText}>{trainedToday ? '追加で行う' : 'START'}</Text>
-        </Pressable>
+        {plan.length > 0 ? (
+          <Pressable style={[styles.startBtn, { backgroundColor: colors.teal }]} onPress={actions.startWorkout}>
+            <Text style={styles.startText}>{trainedToday ? '追加で行う' : 'START'}</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.todaySub}>使える種目がありません。</Text>
+        )}
       </View>
 
       <View style={styles.section}>

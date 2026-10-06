@@ -2,6 +2,7 @@
 // 保存対象はプロフィール・種目別の次回目標・セッション記録・設定の4つ。UI/ロジック層は
 // このモジュールの関数のみを通じて読み書きし、AsyncStorageのキーを直接扱わない。
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CAPACITY_RULES } from '../data/scienceDefaults';
 import type { ExerciseTargets, Profile, SessionRecord, Settings } from '../data/types';
 
 const KEYS = {
@@ -44,7 +45,7 @@ export const appendSession = async (s: SessionRecord): Promise<void> => {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
-  dailyTimeCapMinutes: 30,
+  dailyTimeCapMinutes: CAPACITY_RULES.defaultDailyTimeCapMinutes,
   reminderEnabled: true,
   reminderTimeMinutes: 22 * 60,
   streak: 0,

@@ -3,7 +3,6 @@ import type { CategoryKey } from '../theme/tokens';
 /** bodyweight=器具なし（床）、pullupbar=懸垂マシン上部バー、dipbars=中段の横バー、pushuphandles=土台の短い持ち手。D-010参照。 */
 export type Equipment = 'bodyweight' | 'pullupbar' | 'dipbars' | 'pushuphandles';
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced';
-export type Goal = 'strength' | 'hypertrophy' | 'both';
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 export type Unit = 'reps' | 'seconds';
 
@@ -32,10 +31,8 @@ export interface Profile {
   birthday: string; // ISO date
   sex: 'male' | 'female' | 'other';
   experience: ExperienceLevel;
-  goal: Goal;
   equipment: Equipment[];
   minutesPerSession: number;
-  injuries: string[];
 }
 
 export interface PlannedExercise {

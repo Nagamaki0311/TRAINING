@@ -13,7 +13,7 @@ import type {
 import { findExercise } from '../data/exercisePool';
 import { generateDailyPlan, todayIso } from '../engine/programGenerator';
 import { computeNextTarget, fullHitHistoryFor, shouldSuggestDeload } from '../engine/progression';
-import { FATIGUE_RULES, CAPACITY_RULES, SESSION_RULES } from '../data/scienceDefaults';
+import { FATIGUE_RULES, SESSION_RULES } from '../data/scienceDefaults';
 import * as db from '../storage/db';
 import * as auth from '../storage/auth';
 import { cancelRestNotification, ensureNotificationPermission, scheduleRestEndNotification, syncDailyReminders } from '../engine/timer';
@@ -27,10 +27,8 @@ const SEED_PROFILE: Profile = {
   birthday: '1998-03-11',
   sex: 'male',
   experience: 'beginner',
-  goal: 'hypertrophy',
   equipment: ['bodyweight', 'pullupbar', 'dipbars', 'pushuphandles'],
   minutesPerSession: 15,
-  injuries: [],
 };
 
 // 初回起動時の種目別目標。懸垂は現状1セット5〜6回（ユーザー申告）のため、レンジ下限(4)ではなく5から始める。
@@ -51,6 +49,8 @@ export interface FlashState {
 export interface ActiveSession {
   /** ディロード提案に従った回か。終了時にディロード周期のカウントをリセットするために保持する。 */
   deload: boolean;
+  /** 睡眠不足・体調不良の申告で目標を下げた回か。この回の結果では次回目標を更新しない（D-011）。 */
+  eased: boolean;
   exercises: PlannedExercise[];
   exIdx: number;
   setIdx: number;
@@ -104,7 +104,7 @@ const initialState: State = {
   pinError: null,
   profile: SEED_PROFILE,
   targets: {},
-  settings: { ...db.DEFAULT_SETTINGS, dailyTimeCapMinutes: CAPACITY_RULES.defaultDailyTimeCapMinutes },
+  settings: db.DEFAULT_SETTINGS,
   sessions: [],
   preSleepPoor: false,
   preUnwell: false,
@@ -282,7 +282,8 @@ function buildActions(state: State, dispatch: React.Dispatch<Action>, pendingTim
       const deload = shouldSuggestDeload(state.settings.sessionCountSinceDeload);
       let exercises = planForToday(state);
       if (!exercises.length) return; // 使える器具・種目が無い場合は開始しない（現状のSEED_PROFILEでは到達しない）
-      if (state.preUnwell) {
+      const eased = state.preUnwell || state.preSleepPoor;
+      if (eased) {
         exercises = exercises.map((e) => ({
           ...e,
           targetReps: Math.max(1, Math.round(e.targetReps * (1 - FATIGUE_RULES.poorConditionRepCutRatio))),
@@ -290,6 +291,7 @@ function buildActions(state: State, dispatch: React.Dispatch<Action>, pendingTim
       }
       const session: ActiveSession = {
         deload,
+        eased,
         exercises,
         exIdx: 0,
         setIdx: 0,
@@ -418,7 +420,13 @@ function buildActions(state: State, dispatch: React.Dispatch<Action>, pendingTim
     },
     resetAllData: async () => {
       await db.clearAllData();
-      dispatch({ type: 'HYDRATE', payload: { ...initialState, screen: 'loading', hydrated: false } });
+      void syncDailyReminders(false, 0, false, 0); // 残っているリマインドを取り消す
+      // hydrate（起動時1回のみ）は再実行されないため、初期状態へ直接戻す。PINはSecureStoreに残る。
+      const hasPin = await auth.hasPin();
+      dispatch({
+        type: 'HYDRATE',
+        payload: { ...initialState, targets: SEED_TARGETS, hasPin, screen: hasPin ? 'pin' : 'pin-setup' },
+      });
     },
   };
 }
@@ -452,8 +460,9 @@ async function finishSession(
   const fatigueValues = allSessions.slice(-3).map((r) => r.fatigue).filter((v): v is number => v !== null);
   const avgFatigueLast3 = fatigueValues.length ? fatigueValues.reduce((a, b) => a + b, 0) / fatigueValues.length : null;
 
+  // ディロード日・体調申告日は目標を下げて実施しているため、その結果から次回目標を計算しない。
   const targets: ExerciseTargets = { ...state.targets };
-  for (const e of s.exercises) {
+  for (const e of s.deload || s.eased ? [] : s.exercises) {
     const { nextTargetReps } = computeNextTarget({
       exercise: e,
       recentFullHits: fullHitHistoryFor(e.exerciseId, allSessions),
@@ -463,12 +472,15 @@ async function finishSession(
     targets[e.exerciseId] = { targetReps: nextTargetReps, prevReps: e.targetReps };
   }
 
-  const sessionCountSinceDeload = s.deload ? 0 : state.settings.sessionCountSinceDeload + 1;
+  // ストリーク・ディロード周期は日単位で数える（同日の追加セッションでは進めない）。
+  const firstOfDay = !state.sessions.some((r) => r.date === record.date);
+  const dayCount = firstOfDay ? 1 : 0;
+  const streak = state.settings.streak + dayCount;
   const settings: Settings = {
     ...state.settings,
-    streak: state.settings.streak + 1,
-    sessionCountSinceDeload,
-    lastDeloadSessionCount: s.deload ? state.settings.streak + 1 : state.settings.lastDeloadSessionCount,
+    streak,
+    sessionCountSinceDeload: s.deload ? 0 : state.settings.sessionCountSinceDeload + dayCount,
+    lastDeloadSessionCount: s.deload ? streak : state.settings.lastDeloadSessionCount,
   };
 
   try {
@@ -482,7 +494,7 @@ async function finishSession(
   }
   cancelRestNotification();
   // 当日分は実施済みになったので、今日のリマインドを取り消す。
-  await syncDailyReminders(settings.reminderEnabled, settings.reminderTimeMinutes, true, state.profile.minutesPerSession);
+  void syncDailyReminders(settings.reminderEnabled, settings.reminderTimeMinutes, true, state.profile.minutesPerSession);
 
   dispatch({ type: 'FINISH_SESSION', record, targets, settings });
 }
@@ -511,7 +523,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       const settings = await db.getSettings();
       const sessions = await db.getSessions();
       const today = todayIso();
-      await syncDailyReminders(
+      void syncDailyReminders(
         settings.reminderEnabled,
         settings.reminderTimeMinutes,
         sessions.some((r) => r.date === today),
@@ -562,4 +574,4 @@ export function exerciseName(id: string): string {
   return findExercise(id)?.name ?? id;
 }
 
-export { todayIso, REST_SECONDS };
+export { todayIso };
