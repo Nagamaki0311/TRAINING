@@ -7,7 +7,8 @@ export interface CapacityInput {
   dailyTimeCapMinutes: number;
   setsDoneToday: number;
   plannedTotalSets: number;
-  setsDoneTodayForActiveCategory: number;
+  /** 本日、1つのカテゴリに対して実施したセット数の最大値 */
+  maxSetsInOneCategoryToday: number;
   fatigueLast3: number[]; // セット完了ごとに記録した体感疲労度（1-5）のうち直近3件
 }
 
@@ -27,7 +28,7 @@ export function computeTodayCapacity(input: CapacityInput): CapacityResult {
     input.plannedTotalSets > 0
       ? input.setsDoneToday / (input.plannedTotalSets * CAPACITY_RULES.setsOverPlanRatio)
       : 0;
-  const singleCategoryRatio = input.setsDoneTodayForActiveCategory / CAPACITY_RULES.singleCategoryDailySetCap;
+  const singleCategoryRatio = input.maxSetsInOneCategoryToday / CAPACITY_RULES.singleCategoryDailySetCap;
   const fatigueAvg = input.fatigueLast3.length
     ? input.fatigueLast3.reduce((a, b) => a + b, 0) / input.fatigueLast3.length
     : 0;

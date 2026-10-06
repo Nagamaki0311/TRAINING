@@ -11,7 +11,6 @@ import { AppStateProvider, useAppState } from './src/state/AppState';
 import { colors } from './src/theme/tokens';
 import { PinScreen } from './src/screens/PinScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
-import { CategoryScreen } from './src/screens/CategoryScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
 import { CompleteScreen } from './src/screens/CompleteScreen';
 import { CalendarScreen } from './src/screens/CalendarScreen';
@@ -31,14 +30,13 @@ function Root() {
     );
   }
 
-  const showNav = state.screen === 'home' || state.screen === 'cat' || state.screen === 'cal';
+  const showNav = state.screen === 'home' || state.screen === 'cal';
 
   return (
     <View style={styles.flex}>
       <View style={styles.flex}>
         {state.screen === 'pin' || state.screen === 'pin-setup' ? <PinScreen /> : null}
         {state.screen === 'home' ? <HomeScreen /> : null}
-        {state.screen === 'cat' ? <CategoryScreen /> : null}
         {state.screen === 'exec' ? <WorkoutScreen /> : null}
         {state.screen === 'complete' ? <CompleteScreen /> : null}
         {state.screen === 'cal' ? <CalendarScreen /> : null}
@@ -47,8 +45,8 @@ function Root() {
       <SettingsSheet
         visible={state.settingsOpen}
         onClose={actions.closeSettings}
-        dailyTimeCapMinutes={state.settings.dailyTimeCapMinutes}
-        onChangeDailyCap={actions.updateDailyCap}
+        settings={state.settings}
+        onUpdateSettings={actions.updateSettings}
         onResetAll={actions.resetAllData}
       />
     </View>

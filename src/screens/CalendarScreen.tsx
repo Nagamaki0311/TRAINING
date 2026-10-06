@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { categoryTokens, colors, fonts } from '../theme/tokens';
-import { exerciseDef, useAppState } from '../state/AppState';
+import { categoryOf } from '../data/exercisePool';
+import { exerciseName, useAppState } from '../state/AppState';
 import type { CategoryKey } from '../theme/tokens';
 
 function pad(n: number) {
@@ -17,11 +18,15 @@ export function CalendarScreen() {
   const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // 0=Mon
 
   const sessionsByDate = useMemo(() => {
-    const map = new Map<string, CategoryKey[]>();
+    // 日付ごとに、その日にセットを実施したカテゴリの集合（重複なし）を持つ。
+    const map = new Map<string, Set<CategoryKey>>();
     for (const s of state.sessions) {
-      const list = map.get(s.date) ?? [];
-      list.push(s.category);
-      map.set(s.date, list);
+      const set = map.get(s.date) ?? new Set<CategoryKey>();
+      for (const r of s.sets) {
+        const c = categoryOf(r.exerciseId);
+        if (c) set.add(c);
+      }
+      map.set(s.date, set);
     }
     return map;
   }, [state.sessions]);
@@ -29,22 +34,28 @@ export function CalendarScreen() {
   const todayStr = `${year}-${pad(month + 1)}-${pad(now.getDate())}`;
   const selectedDate = state.calDay ?? todayStr;
 
-  const cells: { label: string; date: string | null; categories: CategoryKey[]; isToday: boolean }[] = [];
-  for (let i = 0; i < firstWeekday; i++) cells.push({ label: '', date: null, categories: [], isToday: false });
+  const cells: { label: string; date: string | null; trained: boolean; isToday: boolean }[] = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push({ label: '', date: null, trained: false, isToday: false });
   for (let d = 1; d <= daysInMonth; d++) {
     const date = `${year}-${pad(month + 1)}-${pad(d)}`;
-    cells.push({ label: String(d), date, categories: sessionsByDate.get(date) ?? [], isToday: date === todayStr });
+    cells.push({ label: String(d), date, trained: sessionsByDate.has(date), isToday: date === todayStr });
   }
 
-  const counts: Record<CategoryKey, number> = { chest: 0, core: 0, arms: 0, back: 0 };
-  for (const list of sessionsByDate.values()) for (const c of list) counts[c]++;
+  const counts: Record<CategoryKey, number> = { chest: 0, core: 0, arms: 0, back: 0, legs: 0 };
+  for (const set of sessionsByDate.values()) for (const c of set) counts[c]++;
 
   const monthSessions = state.sessions.filter((s) => s.date.startsWith(`${year}-${pad(month + 1)}`));
   const ratePct = daysInMonth ? Math.round((new Set(monthSessions.map((s) => s.date)).size / daysInMonth) * 100) : 0;
 
   const daySessions = state.sessions.filter((s) => s.date === selectedDate);
-  const dayCat = daySessions[0]?.category;
-  const dc = dayCat ? categoryTokens[dayCat] : null;
+  // 選択日の種目別セット結果（複数セッションがある日も合算して種目ごとに並べる）。
+  const dayExercises = useMemo(() => {
+    const byEx = new Map<string, number[]>();
+    for (const s of daySessions) for (const r of s.sets) byEx.set(r.exerciseId, [...(byEx.get(r.exerciseId) ?? []), r.reps]);
+    return [...byEx.entries()];
+  }, [state.sessions, selectedDate]);
+  const dayDurationSec = daySessions.reduce((a, s) => a + s.durationSec, 0);
+  const daySetCount = daySessions.reduce((a, s) => a + s.sets.length, 0);
 
   return (
     <View style={styles.wrap}>
@@ -61,9 +72,8 @@ export function CalendarScreen() {
 
       <View style={styles.grid}>
         {cells.map((c, i) => {
-          const primary = c.categories[0];
-          const bg = primary ? categoryTokens[primary].color : c.date ? 'rgba(255,255,255,.05)' : 'transparent';
-          const fg = primary ? categoryTokens[primary].fg : c.date ? 'rgba(255,255,255,.3)' : 'transparent';
+          const bg = c.trained ? colors.teal : c.date ? 'rgba(255,255,255,.05)' : 'transparent';
+          const fg = c.trained ? '#04120F' : c.date ? 'rgba(255,255,255,.3)' : 'transparent';
           const isSelected = c.date === selectedDate;
           return (
             <Pressable
@@ -79,7 +89,7 @@ export function CalendarScreen() {
       </View>
 
       <View style={styles.legendRow}>
-        {(['core', 'chest', 'arms', 'back'] as CategoryKey[]).map((k) => {
+        {(['core', 'chest', 'arms', 'back', 'legs'] as CategoryKey[]).map((k) => {
           const c = categoryTokens[k];
           return (
             <View key={k} style={[styles.legendItem, { borderLeftColor: c.color }]}>
@@ -91,27 +101,27 @@ export function CalendarScreen() {
       </View>
 
       <ScrollView style={styles.dayPanel}>
-        {daySessions.length === 0 || !dc ? (
+        {daySessions.length === 0 ? (
           <Text style={styles.emptyText}>この日の記録はありません</Text>
         ) : (
           <>
             <View style={styles.dayHeadRow}>
-              <View style={[styles.dayBadge, { backgroundColor: dc.glow, borderColor: dc.color }]}>
-                <Text style={[styles.dayBadgeText, { color: dc.color }]}>{dc.kanji}</Text>
+              <View style={[styles.dayBadge, { backgroundColor: 'rgba(0,229,199,.2)', borderColor: colors.teal }]}>
+                <Text style={[styles.dayBadgeText, { color: colors.teal }]}>全</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.dayTitle}>{selectedDate.slice(5).replace('-', '/')} {dc.name}</Text>
+                <Text style={styles.dayTitle}>{selectedDate.slice(5).replace('-', '/')} 今日のプラン</Text>
                 <Text style={styles.dayMeta}>
-                  {Math.round(daySessions[0].durationSec / 60)}分{Math.round(daySessions[0].durationSec % 60)}秒 · {daySessions[0].sets.length}セット
+                  {Math.floor(dayDurationSec / 60)}分{Math.round(dayDurationSec % 60)}秒 · {daySetCount}セット
                 </Text>
               </View>
-              <Text style={styles.dayRank}>{daySessions[0].rank}</Text>
+              <Text style={styles.dayRank}>{daySessions[daySessions.length - 1].rank}</Text>
             </View>
             <View style={{ marginTop: 12 }}>
-              {daySessions[0].sets.slice(0, 6).map((r, i) => (
-                <View key={i} style={styles.dayRow}>
-                  <Text style={styles.dayRowName}>{exerciseDef(r.exerciseId).name}</Text>
-                  <Text style={[styles.dayRowReps, { color: r.hit ? colors.teal : colors.textDim2 }]}>{r.reps}</Text>
+              {dayExercises.map(([id, reps]) => (
+                <View key={id} style={styles.dayRow}>
+                  <Text style={styles.dayRowName}>{exerciseName(id)}</Text>
+                  <Text style={[styles.dayRowReps, { color: colors.teal }]}>{reps.join(' / ')}</Text>
                 </View>
               ))}
             </View>

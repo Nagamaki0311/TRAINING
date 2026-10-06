@@ -21,7 +21,7 @@ export const colors = {
   danger: '#FF4D2E',
 } as const;
 
-export type CategoryKey = 'chest' | 'core' | 'arms' | 'back';
+export type CategoryKey = 'chest' | 'core' | 'arms' | 'back' | 'legs';
 
 export const categoryTokens: Record<
   CategoryKey,
@@ -31,6 +31,7 @@ export const categoryTokens: Record<
   core: { name: '腹筋崩壊', en: 'CORE', kanji: '腹', color: '#00E5C7', glow: 'rgba(0,229,199,.3)', fg: '#04120F' },
   arms: { name: '両腕山脈', en: 'ARMS', kanji: '腕', color: '#FFC53D', glow: 'rgba(255,197,61,.3)', fg: '#120C02' },
   back: { name: '背筋鬼面', en: 'BACK', kanji: '背', color: '#7C6BFF', glow: 'rgba(124,107,255,.3)', fg: '#0A0812' },
+  legs: { name: '脚部強化', en: 'LEGS', kanji: '脚', color: '#5BE37D', glow: 'rgba(91,227,125,.3)', fg: '#04120A' },
 };
 
 export const fonts = {

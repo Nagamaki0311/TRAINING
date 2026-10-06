@@ -46,3 +46,34 @@ export async function cancelRestNotification(): Promise<void> {
   }
   scheduledId = null;
 }
+
+// ===== SECTION: 毎日のリマインド =====
+// 日付指定の通知を今後14日分、固定ID（daily-reminder-N）で登録する。アプリ起動時・セッション終了時・
+// 設定変更時に張り直し、実施済みの当日分は登録しない。14日以上アプリを開かないと通知は止まる（D-012）。
+const REMINDER_DAYS = 14;
+const reminderId = (offset: number) => `daily-reminder-${offset}`;
+
+export async function syncDailyReminders(
+  enabled: boolean,
+  timeMinutes: number,
+  trainedToday: boolean,
+  sessionMinutes: number
+): Promise<void> {
+  try {
+    for (let i = 0; i < REMINDER_DAYS; i++) await Notifications.cancelScheduledNotificationAsync(reminderId(i));
+    if (!enabled) return;
+    await ensureNotificationPermission();
+    const now = new Date();
+    for (let i = 0; i < REMINDER_DAYS; i++) {
+      const at = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, Math.floor(timeMinutes / 60), timeMinutes % 60, 0);
+      if (at.getTime() <= now.getTime() || (i === 0 && trainedToday)) continue;
+      await Notifications.scheduleNotificationAsync({
+        identifier: reminderId(i),
+        content: { title: '今日のトレーニング', body: `${sessionMinutes}分のメニューを用意しました。` },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at },
+      });
+    }
+  } catch {
+    // 通知の登録に失敗してもアプリ本体の動作は継続する。
+  }
+}

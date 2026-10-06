@@ -1,5 +1,6 @@
 // カテゴリ別種目プール。出典: project/Training App プロトタイプ.dc.html の種目データを土台に、
-// docs/training-science.md 8章の指針（カテゴリ5〜10種目・自重中心・設備タグ・難易度）に沿って拡張した。
+// docs/training-science.md 8章の指針（カテゴリ5〜10種目・設備タグ・難易度）に沿って、
+// 懸垂マシン（上部バー・中段バー・土台の持ち手）と器具なしの自重種目に統一した（D-010）。
 import type { ExerciseDef } from './types';
 
 export const EXERCISE_POOL: ExerciseDef[] = [
@@ -23,14 +24,14 @@ export const EXERCISE_POOL: ExerciseDef[] = [
     id: 'chest_incline_pushup',
     name: 'インクラインプッシュアップ',
     category: 'chest',
-    equipment: ['bodyweight'],
+    equipment: ['dipbars'],
     difficulty: 'beginner',
     unit: 'reps',
     repRangeLow: 8,
     repRangeHigh: 15,
     how: {
-      steps: ['手を台や椅子に置き、体を斜めの一直線にする', '胸が台に近づくまで肘を曲げる', '肘を伸ばして戻す'],
-      point: '台が高いほど負荷は軽くなります。12回できたら台を低くして負荷を上げる。',
+      steps: ['中段の横バーに肩幅で手を置き、体を斜めの一直線にする', '胸がバーに近づくまで肘を曲げる', '肘を伸ばして戻す'],
+      point: '足を後ろに下げるほど負荷が上がります。12回できたら足を下げて負荷を上げる。マシンが動かないか確認してから行う。',
       breath: '下げながら吸う・上げながら吐く',
     },
   },
@@ -50,32 +51,17 @@ export const EXERCISE_POOL: ExerciseDef[] = [
     },
   },
   {
-    id: 'chest_decline_pushup',
-    name: 'デクラインプッシュアップ',
-    category: 'chest',
-    equipment: ['bodyweight'],
-    difficulty: 'intermediate',
-    unit: 'reps',
-    repRangeLow: 8,
-    repRangeHigh: 15,
-    how: {
-      steps: ['足を台に乗せ、手は肩幅で床につく', '体を一直線に保ったまま胸を床に近づける', '肘を伸ばして押し上げる'],
-      point: '足の位置が高いほど大胸筋上部・肩への負荷が増えます。腰を反らさない。',
-      breath: '下げながら吸う・押しながら吐く',
-    },
-  },
-  {
     id: 'chest_dips',
     name: 'ディップス',
     category: 'chest',
-    equipment: ['bodyweight'],
+    equipment: ['dipbars'],
     difficulty: 'intermediate',
     unit: 'reps',
     repRangeLow: 4,
     repRangeHigh: 8,
     how: {
-      steps: ['椅子や台に手をつき、指先を前に向ける', '肘を後ろに曲げ、肩が肘の高さまで下がるまで沈む', '肘を伸ばして体を押し上げる'],
-      point: '肩をすくめない。肩の前側に痛みが出る深さまでは下げない。',
+      steps: ['中段の横バーを握り、足を床から浮かせて腕を伸ばす', '上体をやや前に倒し、肩が肘の高さまで下がるまで沈む', '肘を伸ばして体を押し上げる'],
+      point: '足が床に着く高さでは行えません。肩をすくめず、肩の前側に痛みが出る深さまでは下げない。マシンが揺れる場合は中止する。',
       breath: '下げながら吸う・上げながら吐く',
     },
   },
@@ -91,6 +77,21 @@ export const EXERCISE_POOL: ExerciseDef[] = [
     how: {
       steps: ['腰を高く突き上げ、体をV字にする', '頭を床に近づけるように肘を曲げる', '肩で押し上げて戻す'],
       point: '肩に効かせる種目。首に体重を乗せず、手で床を押す意識で。',
+      breath: '下げながら吸う・押しながら吐く',
+    },
+  },
+  {
+    id: 'chest_handle_pushup',
+    name: 'プッシュアップ（ハンドル）',
+    category: 'chest',
+    equipment: ['pushuphandles'],
+    difficulty: 'intermediate',
+    unit: 'reps',
+    repRangeLow: 8,
+    repRangeHigh: 15,
+    how: {
+      steps: ['土台の短い持ち手を握り、体を頭からかかとまで一直線にする', '胸が持ち手の高さを越えるまで深く下げる', '肘を伸ばし切らずに押し上げる'],
+      point: '床より深く下げられるため、胸の伸びが大きくなります。手首をまっすぐに保ち、腰を落とさない。',
       breath: '下げながら吸う・押しながら吐く',
     },
   },
@@ -201,6 +202,36 @@ export const EXERCISE_POOL: ExerciseDef[] = [
       breath: 'ひねるたびに吐く',
     },
   },
+  {
+    id: 'core_hanging_knee_raise',
+    name: 'ハンギングニーレイズ',
+    category: 'core',
+    equipment: ['pullupbar'],
+    difficulty: 'intermediate',
+    unit: 'reps',
+    repRangeLow: 8,
+    repRangeHigh: 15,
+    how: {
+      steps: ['上部バーを握って足を浮かせ、体を安定させる', '腰を丸めながら膝を胸へ引き上げる', '反動を使わずゆっくり下ろす'],
+      point: '体が揺れる場合は膝を曲げたまま小さく動かす。握力が先に尽きる場合は懸垂系の種目の前に置かない。',
+      breath: '上げながら吐く・下ろしながら吸う',
+    },
+  },
+  {
+    id: 'core_hanging_leg_raise',
+    name: 'ハンギングレッグレイズ',
+    category: 'core',
+    equipment: ['pullupbar'],
+    difficulty: 'advanced',
+    unit: 'reps',
+    repRangeLow: 6,
+    repRangeHigh: 12,
+    how: {
+      steps: ['上部バーを握って足を浮かせ、体を安定させる', '膝を伸ばしたまま、足を腰の高さ以上へ持ち上げる', '反動を使わずゆっくり下ろす'],
+      point: '腰を反らさない。膝を曲げると負荷が下がるため、まずハンギングニーレイズで回数を伸ばす。',
+      breath: '上げながら吐く・下ろしながら吸う',
+    },
+  },
 
   // ── 腕: 両腕山脈 ───────────────────────────────
   {
@@ -249,21 +280,6 @@ export const EXERCISE_POOL: ExerciseDef[] = [
     },
   },
   {
-    id: 'arms_reverse_dips',
-    name: 'リバースディップス',
-    category: 'arms',
-    equipment: ['bodyweight'],
-    difficulty: 'intermediate',
-    unit: 'reps',
-    repRangeLow: 8,
-    repRangeHigh: 15,
-    how: {
-      steps: ['台に後ろ手をつき、脚を前に伸ばす', '肘を後ろに曲げて腰を下げる', '肘を伸ばして戻す'],
-      point: '肩に痛みが出る手前で止める。手首がつらい場合は指先を外向きに。',
-      breath: '下げながら吸う・上げながら吐く',
-    },
-  },
-  {
     id: 'arms_diamond_pushup',
     name: 'ダイヤモンドプッシュアップ',
     category: 'arms',
@@ -276,6 +292,21 @@ export const EXERCISE_POOL: ExerciseDef[] = [
       steps: ['両手の親指と人差し指でダイヤモンド形を作り、胸の下に置く', '肘を体側に沿わせて下げる', '肘を伸ばして押し上げる'],
       point: '上腕三頭筋への負荷が非常に高い種目。手首に不安があれば無理をしない。',
       breath: '下げながら吸う・押しながら吐く',
+    },
+  },
+  {
+    id: 'arms_triceps_dips',
+    name: 'トライセプスディップス',
+    category: 'arms',
+    equipment: ['dipbars'],
+    difficulty: 'intermediate',
+    unit: 'reps',
+    repRangeLow: 6,
+    repRangeHigh: 12,
+    how: {
+      steps: ['中段の横バーを握り、足を浮かせて上体を立てる', '肘を後ろへ向けたまま、肘が90度になるまで沈む', '肘を伸ばして押し上げる'],
+      point: '上体を立てて肘を体側に沿わせると上腕三頭筋に効きます。肩をすくめない。マシンが揺れる場合は中止する。',
+      breath: '下げながら吸う・上げながら吐く',
     },
   },
 
@@ -291,37 +322,7 @@ export const EXERCISE_POOL: ExerciseDef[] = [
     repRangeHigh: 8,
     how: {
       steps: ['バーを肩幅より広めに順手で握る', '肩を下げてから、胸をバーに近づける', 'ゆっくり下ろして肩が上がりきる前に止める'],
-      point: 'できない場合は台で足を補助、または斜め懸垂に置き換える。',
-      breath: '上げながら吐く・下げながら吸う',
-    },
-  },
-  {
-    id: 'back_inverted_row',
-    name: 'インバーテッドロウ',
-    category: 'back',
-    equipment: ['bodyweight'],
-    difficulty: 'beginner',
-    unit: 'reps',
-    repRangeLow: 8,
-    repRangeHigh: 15,
-    how: {
-      steps: ['低いバーの下に仰向けで入り、バーを握る', '体を一直線に保ったまま胸をバーへ引き寄せる', 'ゆっくり戻す'],
-      point: '肩甲骨を寄せてから肘を引く。腰が落ちないよう腹に力を入れる。',
-      breath: '引きながら吐く・戻しながら吸う',
-    },
-  },
-  {
-    id: 'back_superman',
-    name: 'スーパーマン',
-    category: 'back',
-    equipment: ['bodyweight'],
-    difficulty: 'beginner',
-    unit: 'reps',
-    repRangeLow: 15,
-    repRangeHigh: 30,
-    how: {
-      steps: ['床にうつ伏せになり、手足を伸ばす', '手足を同時に持ち上げて2秒静止', 'ゆっくり下ろす'],
-      point: '首を反らしすぎない。視線は床のまま。',
+      point: 'できない場合は台で足を補助、またはネガティブ懸垂に置き換える。',
       breath: '上げながら吐く・下げながら吸う',
     },
   },
@@ -341,21 +342,122 @@ export const EXERCISE_POOL: ExerciseDef[] = [
     },
   },
   {
-    id: 'back_reverse_plank',
-    name: 'リバースプランク（秒）',
+    id: 'back_neutral_pullup',
+    name: 'ニュートラルグリップ懸垂',
     category: 'back',
-    equipment: ['bodyweight'],
+    equipment: ['pullupbar'],
+    difficulty: 'intermediate',
+    unit: 'reps',
+    repRangeLow: 4,
+    repRangeHigh: 8,
+    how: {
+      steps: ['上部バーの内側に曲がった部分を、手のひらが向き合う向きで握る', '肩を下げてから、胸をバーに近づける', 'ゆっくり下ろして肩が上がりきる前に止める'],
+      point: '通常の懸垂より肩への負担が少ない握りです。反動を使わない。',
+      breath: '上げながら吐く・下げながら吸う',
+    },
+  },
+  {
+    id: 'back_negative_pullup',
+    name: 'ネガティブ懸垂',
+    category: 'back',
+    equipment: ['pullupbar'],
+    difficulty: 'beginner',
+    unit: 'reps',
+    repRangeLow: 3,
+    repRangeHigh: 6,
+    how: {
+      steps: ['台に乗るか跳び上がり、顎がバーを越えた状態を作る', '5秒以上かけて腕を伸ばしていく', '下まで降りたら台に戻ってやり直す'],
+      point: '懸垂の回数を伸ばす導入種目です。下ろす速度を落とすほど効果が高い。',
+      breath: '下ろしながら吐き続ける',
+    },
+  },
+  {
+    id: 'back_dead_hang',
+    name: 'ぶら下がり（秒）',
+    category: 'back',
+    equipment: ['pullupbar'],
     difficulty: 'beginner',
     unit: 'seconds',
     repRangeLow: 20,
     repRangeHigh: 45,
     how: {
-      steps: ['脚を伸ばして座り、手を腰の後ろにつく', '腰を持ち上げ、頭からかかとまで一直線にする', 'その姿勢を保つ'],
-      point: '肩がすくみやすいので、肩甲骨を下げて胸を開く意識を持つ。',
+      steps: ['上部バーを肩幅で握り、足を床から浮かせる', '肩を耳から遠ざけるように下げる', 'その姿勢を保つ'],
+      point: '握力と肩まわりの安定を鍛えます。肩に痛みが出たら中止する。他のぶら下がり系種目の前に握力を使い切らない。',
       breath: '止めずに浅く連続して呼吸する',
     },
   },
+
+  // ── 脚: 脚部強化（腹部重視のため補助。静音・器具なしの種目のみ） ──────────────
+  {
+    id: 'legs_squat',
+    name: 'スクワット',
+    category: 'legs',
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    unit: 'reps',
+    repRangeLow: 15,
+    repRangeHigh: 30,
+    how: {
+      steps: ['足を肩幅に開き、つま先をやや外へ向ける', '胸を張ったまま、太ももが床と平行になるまで腰を下げる', 'かかとで床を押して立ち上がる'],
+      point: '膝がつま先より大きく内側に入らないようにする。背中を丸めない。',
+      breath: '下げながら吸う・立ちながら吐く',
+    },
+  },
+  {
+    id: 'legs_lunge',
+    name: 'ランジ',
+    category: 'legs',
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    unit: 'reps',
+    repRangeLow: 10,
+    repRangeHigh: 20,
+    how: {
+      steps: ['足を前後に大きく開いて立つ', '後ろの膝が床すれすれになるまで腰を真下に下げる', '前足のかかとで押して戻る（左右で1回）'],
+      point: '前膝が内側へ入らないようにする。上体はまっすぐ保つ。',
+      breath: '下げながら吸う・立ちながら吐く',
+    },
+  },
+  {
+    id: 'legs_glute_bridge',
+    name: 'グルートブリッジ',
+    category: 'legs',
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    unit: 'reps',
+    repRangeLow: 15,
+    repRangeHigh: 30,
+    how: {
+      steps: ['仰向けで膝を立て、足を肩幅に置く', 'お尻を持ち上げ、膝から肩まで一直線にする', '上で1秒止めてゆっくり下ろす'],
+      point: '腰を反らして持ち上げない。お尻と太もも裏で押し上げる意識で。',
+      breath: '上げながら吐く・下ろしながら吸う',
+    },
+  },
+  {
+    id: 'legs_calf_raise',
+    name: 'カーフレイズ',
+    category: 'legs',
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    unit: 'reps',
+    repRangeLow: 15,
+    repRangeHigh: 30,
+    how: {
+      steps: ['足を腰幅に開いて立つ（壁や柱に軽く手を添えてよい）', 'かかとを高く持ち上げ、1秒止める', 'ゆっくり下ろす'],
+      point: '可動域を大きく使う。膝を曲げ伸ばしして反動を使わない。',
+      breath: '上げながら吐く・下ろしながら吸う',
+    },
+  },
 ];
+
+const EXERCISE_BY_ID = new Map(EXERCISE_POOL.map((e) => [e.id, e]));
+/** 記録に残る種目IDから種目定義を引く。プールから削除された種目のIDはundefinedを返す。 */
+export function findExercise(exerciseId: string): ExerciseDef | undefined {
+  return EXERCISE_BY_ID.get(exerciseId);
+}
+export function categoryOf(exerciseId: string) {
+  return EXERCISE_BY_ID.get(exerciseId)?.category;
+}
 
 export function exercisesFor(categoryKey: string, equipment: string[]): ExerciseDef[] {
   return EXERCISE_POOL.filter(

@@ -23,6 +23,8 @@
 | T-006 | プログラム生成・自動更新・オーバーワーク判定ロジック | 高 | 完了 | claude | programGenerator.ts（週間プラン・初期プログラム生成）・progression.ts（漸進的過負荷・疲労/体調補正・ディロード提案）・capacity.ts（3軸オーバーワーク判定）を実装しAppStateへ結線。自己レビューでgenerateWeekPlanの日数バグを発見・修正 |
 | T-007 | 永続化・PIN認証・タイマー | 高 | 完了 | claude | db.ts（AsyncStorage）・auth.ts（SHA-256+SecureStore PIN、expo-local-authentication生体認証）・timer.ts（タイムスタンプベースのレスト通知）を実装（D-004参照） |
 | T-008 | 敵対的レビュー・仕上げ | 高 | 完了 | general-purpose（reviewer代替） | High2件（最終セット完了時の競合状態）・Medium2件（日付ソートcomparator・永続化エラーハンドリング）をCONFIRMED/PLAUSIBLEで検出、全件修正（D-008参照）。修正後`npx tsc --noEmit`・`expo export --platform ios`で再検証済み |
+| T-009 | 器具統一（懸垂マシン）・種目プール再作成・日次プラン自動生成（15分・毎日・部位バランス） | 高 | レビュー中 | claude | D-010・D-011。CategoryScreen・週間プランを削除し、HomeScreenを「今日のプラン」に一本化。`tsc`・`expo export --platform ios`は通過、シミュレーションで14日間15分以内・全カテゴリ毎日を確認 |
+| T-010 | 毎日のリマインド通知（22:00仮設定） | 高 | レビュー中 | claude | D-012。設定画面に ON/OFF・時刻。実機での通知確認は未実施 |
 
 ## バックログ（未着手・優先度未確定）
 

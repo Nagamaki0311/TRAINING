@@ -23,10 +23,10 @@ Expo SDK 57 / React Native / TypeScript。ナビゲーションライブラリ�
 - `App.tsx`: フォント読み込み・画面切り替え・下部ナビ・設定シートのルート
 - `src/theme/`: カラー・フォント・アニメーション秒数などのデザイントークン
 - `src/data/`: プロフィール/種目プール/科学的数値基準の型とデータ（docs/training-science.md準拠）
-- `src/engine/`: プログラム自動生成・記録ベース自動更新・オーバーワーク判定・レスト通知のロジック
+- `src/engine/`: 日次プラン生成（15分・全カテゴリ・部位バランス）・記録ベース自動更新・オーバーワーク判定・レスト/毎日リマインド通知のロジック
 - `src/storage/`: AsyncStorageリポジトリ、PIN・生体認証
 - `src/state/AppState.tsx`: グローバル状態（画面遷移・ワークアウトセッション進行）
-- `src/screens/`: PIN・ホーム・カテゴリ選択・ワークアウト実行・コンプリート・カレンダーの各画面とUIコンポーネント
+- `src/screens/`: PIN・ホーム（今日のプラン）・ワークアウト実行・コンプリート・カレンダーの各画面とUIコンポーネント
 
 デザイン出典は`docs/decisions.md`（旧Claude Design成果物の`Training App プロトタイプ.dc.html`）。設計上の簡略化・逸脱はD-003〜D-007を参照。
 

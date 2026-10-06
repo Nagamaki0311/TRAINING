@@ -11,7 +11,6 @@ interface Props {
 
 const ITEMS: { key: Screen; label: string }[] = [
   { key: 'home', label: 'ホーム' },
-  { key: 'cat', label: 'カテゴリ' },
   { key: 'cal', label: '記録' },
 ];
 
