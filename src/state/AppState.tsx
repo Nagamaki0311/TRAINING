@@ -2,23 +2,21 @@
 // アプリ全体の状態（プロフィール・プログラム・記録・画面遷移・進行中ワークアウト）を1箇所で保持する。
 // 永続化はsrc/storage/db.tsを通じてのみ行い、このファイルはAsyncStorageのキーを直接扱わない。
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
-import type { CategoryKey } from '../theme/tokens';
 import type {
+  ExerciseTargets,
   PlannedExercise,
   Profile,
-  ProgramDay,
   SessionRecord,
   SetRecord,
   Settings,
-  WeekPlan,
 } from '../data/types';
-import { EXERCISE_POOL } from '../data/exercisePool';
-import { generateInitialProgram, generateWeekPlan } from '../engine/programGenerator';
-import { computeNextTarget, fullHitHistoryFor, shouldSuggestDeload, applyDeload } from '../engine/progression';
-import { FATIGUE_RULES, CAPACITY_RULES } from '../data/scienceDefaults';
+import { findExercise } from '../data/exercisePool';
+import { generateDailyPlan, todayIso } from '../engine/programGenerator';
+import { computeNextTarget, fullHitHistoryFor, shouldSuggestDeload } from '../engine/progression';
+import { FATIGUE_RULES, SESSION_RULES } from '../data/scienceDefaults';
 import * as db from '../storage/db';
 import * as auth from '../storage/auth';
-import { cancelRestNotification, ensureNotificationPermission, scheduleRestEndNotification } from '../engine/timer';
+import { cancelRestNotification, ensureNotificationPermission, scheduleRestEndNotification, syncDailyReminders } from '../engine/timer';
 
 // ===== SECTION: 初期プロフィール（工程1のヒアリング結果を種として使用） =====
 // F. オンボーディング画面はデザイン検討時に明示的にスコープ外とされたため未実装（docs/decisions.md D-003参照）。
@@ -28,15 +26,18 @@ const SEED_PROFILE: Profile = {
   weightKg: 58,
   birthday: '1998-03-11',
   sex: 'male',
-  experience: 'beginner',
-  goal: 'both',
-  equipment: ['bodyweight', 'pullupbar'],
-  daysPerWeek: 5,
-  minutesPerSession: 20,
-  injuries: [],
+  experience: 'intermediate',
+  equipment: ['bodyweight', 'pullupbar', 'dipbars', 'pushuphandles'],
+  minutesPerSession: 15,
 };
 
-export type Screen = 'loading' | 'pin-setup' | 'pin' | 'home' | 'cat' | 'exec' | 'complete' | 'cal';
+// 初回起動時の種目別目標。懸垂は現状1セット5〜6回（ユーザー申告）のため、レンジ下限(4)ではなく5から始める。
+const SEED_TARGETS: ExerciseTargets = {
+  back_pullup: { targetReps: 5, prevReps: null },
+  back_neutral_pullup: { targetReps: 5, prevReps: null },
+};
+
+export type Screen = 'loading' | 'pin-setup' | 'pin' | 'home' | 'exec' | 'complete' | 'cal';
 type Phase = 'work' | 'rest';
 
 export interface FlashState {
@@ -46,7 +47,10 @@ export interface FlashState {
 }
 
 export interface ActiveSession {
-  category: CategoryKey;
+  /** ディロード提案に従った回か。終了時にディロード周期のカウントをリセットするために保持する。 */
+  deload: boolean;
+  /** 睡眠不足・体調不良の申告で目標を下げた回か。この回の結果では次回目標を更新しない（D-011）。 */
+  eased: boolean;
   exercises: PlannedExercise[];
   exIdx: number;
   setIdx: number;
@@ -73,12 +77,10 @@ interface State {
   pinError: string | null;
 
   profile: Profile;
-  weekPlan: WeekPlan;
-  program: Record<CategoryKey, ProgramDay> | null;
+  targets: ExerciseTargets;
   settings: Settings;
   sessions: SessionRecord[];
 
-  selectedCategory: CategoryKey;
   preSleepPoor: boolean;
   preUnwell: boolean;
 
@@ -90,15 +92,8 @@ interface State {
   settingsOpen: boolean;
 }
 
-const REST_SECONDS = 45; // docs/training-science.md 6章の休息目安（筋肥大寄り種目の一般的レンジ内）
+const REST_SECONDS = SESSION_RULES.restSeconds; // docs/training-science.md 9章（15分に収めるため短め）
 
-function todayIso(d = new Date()): string {
-  return d.toISOString().slice(0, 10);
-}
-function weekdayOf(d = new Date()): 1 | 2 | 3 | 4 | 5 | 6 | 7 {
-  const js = d.getDay(); // 0=Sun..6=Sat
-  return (js === 0 ? 7 : js) as 1 | 2 | 3 | 4 | 5 | 6 | 7;
-}
 
 const initialState: State = {
   screen: 'loading',
@@ -108,11 +103,9 @@ const initialState: State = {
   pinFirstEntry: null,
   pinError: null,
   profile: SEED_PROFILE,
-  weekPlan: {},
-  program: null,
-  settings: { dailyTimeCapMinutes: CAPACITY_RULES.defaultDailyTimeCapMinutes, streak: 0, lastDeloadSessionCount: 0, sessionCountSinceDeload: 0 },
+  targets: {},
+  settings: db.DEFAULT_SETTINGS,
   sessions: [],
-  selectedCategory: 'chest',
   preSleepPoor: false,
   preUnwell: false,
   session: null,
@@ -129,7 +122,6 @@ type Action =
   | { type: 'PIN_BACKSPACE' }
   | { type: 'PIN_CLEAR'; error?: string | null }
   | { type: 'PIN_ADVANCE_SETUP'; firstEntry: string }
-  | { type: 'SELECT_CATEGORY'; category: CategoryKey }
   | { type: 'TOGGLE_PRE_SLEEP' }
   | { type: 'TOGGLE_PRE_UNWELL' }
   | { type: 'START_SESSION'; session: ActiveSession }
@@ -138,7 +130,7 @@ type Action =
   | { type: 'CLEAR_FLASH' }
   | { type: 'ADVANCE_SET'; exIdx: number; setIdx: number; reps: number }
   | { type: 'TOGGLE_HOW'; on: boolean }
-  | { type: 'FINISH_SESSION'; record: SessionRecord; program: Record<CategoryKey, ProgramDay>; settings: Settings }
+  | { type: 'FINISH_SESSION'; record: SessionRecord; targets: ExerciseTargets; settings: Settings }
   | { type: 'SET_FATIGUE_PICK'; value: number }
   | { type: 'SET_CAL_DAY'; date: string | null }
   | { type: 'OPEN_SETTINGS' }
@@ -162,8 +154,6 @@ function reducer(state: State, action: Action): State {
       return { ...state, pinDraft: '', pinError: action.error ?? null };
     case 'PIN_ADVANCE_SETUP':
       return { ...state, pinFirstEntry: action.firstEntry, pinDraft: '' };
-    case 'SELECT_CATEGORY':
-      return { ...state, selectedCategory: action.category };
     case 'TOGGLE_PRE_SLEEP':
       return { ...state, preSleepPoor: !state.preSleepPoor };
     case 'TOGGLE_PRE_UNWELL':
@@ -216,7 +206,7 @@ function reducer(state: State, action: Action): State {
         session: null,
         lastFinishedSession: action.record,
         sessions: [...state.sessions, action.record],
-        program: action.program,
+        targets: action.targets,
         settings: action.settings,
       };
     case 'SET_FATIGUE_PICK':
@@ -284,22 +274,24 @@ function buildActions(state: State, dispatch: React.Dispatch<Action>, pendingTim
       }
     },
 
-    selectCategory: (category: CategoryKey) => dispatch({ type: 'SELECT_CATEGORY', category }),
     togglePreSleep: () => dispatch({ type: 'TOGGLE_PRE_SLEEP' }),
     togglePreUnwell: () => dispatch({ type: 'TOGGLE_PRE_UNWELL' }),
 
-    startWorkout: async (category: CategoryKey) => {
-      if (!state.program) return;
+    startWorkout: async () => {
       await ensureNotificationPermission();
-      let exercises = state.program[category].exercises;
-      if (state.preUnwell) {
+      const deload = shouldSuggestDeload(state.settings.sessionCountSinceDeload);
+      let exercises = planForToday(state);
+      if (!exercises.length) return; // 使える器具・種目が無い場合は開始しない（現状のSEED_PROFILEでは到達しない）
+      const eased = state.preUnwell || state.preSleepPoor;
+      if (eased) {
         exercises = exercises.map((e) => ({
           ...e,
           targetReps: Math.max(1, Math.round(e.targetReps * (1 - FATIGUE_RULES.poorConditionRepCutRatio))),
         }));
       }
       const session: ActiveSession = {
-        category,
+        deload,
+        eased,
         exercises,
         exIdx: 0,
         setIdx: 0,
@@ -413,14 +405,28 @@ function buildActions(state: State, dispatch: React.Dispatch<Action>, pendingTim
     setCalDay: (date: string | null) => dispatch({ type: 'SET_CAL_DAY', date }),
     openSettings: () => dispatch({ type: 'OPEN_SETTINGS' }),
     closeSettings: () => dispatch({ type: 'CLOSE_SETTINGS' }),
-    updateDailyCap: async (minutes: number) => {
-      const settings = { ...state.settings, dailyTimeCapMinutes: minutes };
+    updateSettings: async (patch: Partial<Settings>) => {
+      const settings = { ...state.settings, ...patch };
       await db.setSettings(settings);
       dispatch({ type: 'UPDATE_SETTINGS', settings });
+      if ('reminderEnabled' in patch || 'reminderTimeMinutes' in patch) {
+        await syncDailyReminders(
+          settings.reminderEnabled,
+          settings.reminderTimeMinutes,
+          state.sessions.some((r) => r.date === todayIso()),
+          state.profile.minutesPerSession
+        );
+      }
     },
     resetAllData: async () => {
       await db.clearAllData();
-      dispatch({ type: 'HYDRATE', payload: { ...initialState, screen: 'loading', hydrated: false } });
+      void syncDailyReminders(false, 0, false, 0); // 残っているリマインドを取り消す
+      // hydrate（起動時1回のみ）は再実行されないため、初期状態へ直接戻す。PINはSecureStoreに残る。
+      const hasPin = await auth.hasPin();
+      dispatch({
+        type: 'HYDRATE',
+        payload: { ...initialState, targets: SEED_TARGETS, hasPin, screen: hasPin ? 'pin' : 'pin-setup' },
+      });
     },
   };
 }
@@ -442,7 +448,6 @@ async function finishSession(
   const record: SessionRecord = {
     id: `${Date.now()}`,
     date: todayIso(),
-    category: s.category,
     sets: results,
     durationSec,
     completed: true,
@@ -452,45 +457,46 @@ async function finishSession(
   };
 
   const allSessions = [...state.sessions, record];
-  const sameCategorySessions = allSessions.filter((r) => r.category === s.category);
-  const fatigueValues = sameCategorySessions.slice(-3).map((r) => r.fatigue).filter((v): v is number => v !== null);
+  const fatigueValues = allSessions.slice(-3).map((r) => r.fatigue).filter((v): v is number => v !== null);
   const avgFatigueLast3 = fatigueValues.length ? fatigueValues.reduce((a, b) => a + b, 0) / fatigueValues.length : null;
 
-  let updatedExercises: PlannedExercise[] = s.exercises.map((e) => {
-    const history = fullHitHistoryFor(e.exerciseId, sameCategorySessions);
+  // ディロード日・体調申告日は目標を下げて実施しているため、その結果から次回目標を計算しない。
+  const targets: ExerciseTargets = { ...state.targets };
+  for (const e of s.deload || s.eased ? [] : s.exercises) {
     const { nextTargetReps } = computeNextTarget({
       exercise: e,
-      recentFullHits: history,
+      recentFullHits: fullHitHistoryFor(e.exerciseId, allSessions),
       avgFatigueLast3,
       feltUnwellToday: false,
     });
-    return { ...e, targetReps: nextTargetReps, prevReps: e.targetReps };
-  });
-
-  const sessionCountSinceDeload = state.settings.sessionCountSinceDeload + 1;
-  let settings: Settings = { ...state.settings, streak: state.settings.streak + 1, sessionCountSinceDeload };
-  if (shouldSuggestDeload(sessionCountSinceDeload)) {
-    updatedExercises = applyDeload(updatedExercises);
-    settings = { ...settings, sessionCountSinceDeload: 0, lastDeloadSessionCount: state.settings.streak + 1 };
+    targets[e.exerciseId] = { targetReps: nextTargetReps, prevReps: e.targetReps };
   }
 
-  const program: Record<CategoryKey, ProgramDay> = {
-    ...(state.program as Record<CategoryKey, ProgramDay>),
-    [s.category]: { category: s.category, exercises: updatedExercises },
+  // ストリーク・ディロード周期は日単位で数える（同日の追加セッションでは進めない）。
+  const firstOfDay = !state.sessions.some((r) => r.date === record.date);
+  const dayCount = firstOfDay ? 1 : 0;
+  const streak = state.settings.streak + dayCount;
+  const settings: Settings = {
+    ...state.settings,
+    streak,
+    sessionCountSinceDeload: s.deload ? 0 : state.settings.sessionCountSinceDeload + dayCount,
+    lastDeloadSessionCount: s.deload ? streak : state.settings.lastDeloadSessionCount,
   };
 
   try {
     await db.appendSession(record);
-    await db.setProgram(program);
+    await db.setTargets(targets);
     await db.setSettings(settings);
   } catch (e) {
     // 永続化に失敗しても、ユーザーをワークアウト実行画面に取り残さないことを優先する。
-    // この回のプログラム自動更新・ストリーク加算は保存されていない可能性がある。
-    console.error('[finishSession] failed to persist session/program/settings', e);
+    // この回の目標更新・ストリーク加算は保存されていない可能性がある。
+    console.error('[finishSession] failed to persist session/targets/settings', e);
   }
   cancelRestNotification();
+  // 当日分は実施済みになったので、今日のリマインドを取り消す。
+  void syncDailyReminders(settings.reminderEnabled, settings.reminderTimeMinutes, true, state.profile.minutesPerSession);
 
-  dispatch({ type: 'FINISH_SESSION', record, program, settings });
+  dispatch({ type: 'FINISH_SESSION', record, targets, settings });
 }
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
@@ -503,26 +509,32 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     if (hydratingRef.current) return;
     hydratingRef.current = true;
     (async () => {
+      await db.removeLegacyKeys();
       let profile = await db.getProfile();
-      let weekPlan = await db.getWeekPlan();
-      let program = await db.getProgram();
       if (!profile) {
         profile = SEED_PROFILE;
-        weekPlan = generateWeekPlan(profile);
-        program = generateInitialProgram(profile);
         await db.setProfile(profile);
-        await db.setWeekPlan(weekPlan);
-        await db.setProgram(program);
+      }
+      let targets = await db.getTargets();
+      if (Object.keys(targets).length === 0) {
+        targets = SEED_TARGETS;
+        await db.setTargets(targets);
       }
       const settings = await db.getSettings();
       const sessions = await db.getSessions();
+      const today = todayIso();
+      void syncDailyReminders(
+        settings.reminderEnabled,
+        settings.reminderTimeMinutes,
+        sessions.some((r) => r.date === today),
+        profile.minutesPerSession
+      );
       const hasPin = await auth.hasPin();
       dispatch({
         type: 'HYDRATE',
         payload: {
           profile,
-          weekPlan: weekPlan ?? {},
-          program,
+          targets,
           settings,
           sessions,
           hasPin,
@@ -541,8 +553,25 @@ export function useAppState(): Ctx {
   return ctx;
 }
 
-export function exerciseDef(id: string) {
-  return EXERCISE_POOL.find((e) => e.id === id)!;
+/** 現在の記録・目標から、今日の15分プランを生成する（ホーム表示と開始時で同じ結果になる純関数）。 */
+export function planForToday(state: Pick<State, 'profile' | 'targets' | 'sessions' | 'settings'>): PlannedExercise[] {
+  return generateDailyPlan({
+    profile: state.profile,
+    targets: state.targets,
+    sessions: state.sessions,
+    today: todayIso(),
+    deload: shouldSuggestDeload(state.settings.sessionCountSinceDeload),
+  });
 }
 
-export { weekdayOf, todayIso, REST_SECONDS };
+/** プランに含まれる種目の定義。プール外のIDは渡されない前提。 */
+export function exerciseDef(id: string) {
+  return findExercise(id)!;
+}
+
+/** 過去の記録表示用。プールから削除された種目のIDでも落ちないようIDをそのまま返す。 */
+export function exerciseName(id: string): string {
+  return findExercise(id)?.name ?? id;
+}
+
+export { todayIso };

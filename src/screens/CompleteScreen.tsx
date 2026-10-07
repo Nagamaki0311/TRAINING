@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { categoryTokens, colors, fonts } from '../theme/tokens';
-import { exerciseDef, useAppState } from '../state/AppState';
+import { colors, fonts } from '../theme/tokens';
+import { useAppState } from '../state/AppState';
 
 const RANK_LINE: Record<string, string> = {
   S: '全セット完遂',
@@ -14,14 +14,9 @@ export function CompleteScreen() {
   const { state, actions } = useAppState();
   const record = state.lastFinishedSession;
   if (!record) return null;
-  const cat = categoryTokens[record.category];
   const totalReps = record.sets.reduce((a, s) => a + s.reps, 0);
   const total = record.sets.length;
   const hits = record.sets.filter((s) => s.hit).length;
-
-  const program = state.program?.[record.category];
-  const nextAdjustExercise = program?.exercises[1] ?? program?.exercises[0];
-  const nextAdjustName = nextAdjustExercise ? exerciseDef(nextAdjustExercise.exerciseId).name : '';
 
   const stats = useMemo(
     () => [
@@ -37,7 +32,7 @@ export function CompleteScreen() {
     <ScrollView style={styles.wrap} contentContainerStyle={{ paddingBottom: 24 }}>
       <View style={styles.header}>
         <Text style={styles.kicker}>WORKOUT COMPLETE</Text>
-        <Text style={styles.catName}>{cat.name}</Text>
+        <Text style={styles.catName}>TODAY'S PLAN</Text>
         <Text style={styles.meta}>{Math.round(record.durationSec / 60)}分 · {total}セット</Text>
       </View>
 
@@ -60,7 +55,7 @@ export function CompleteScreen() {
       <View style={styles.adjustBox}>
         <Text style={styles.adjustKicker}>次回の自動調整</Text>
         <Text style={styles.adjustText}>
-          {record.rank === 'S' ? '全セット達成のため' : '達成状況に応じて'}、次回の{nextAdjustName}の目標を見直しました。
+          {record.rank === 'S' ? '全セット達成のため' : '達成状況に応じて'}、次回の各種目の目標を見直しました。
         </Text>
       </View>
 
@@ -71,7 +66,7 @@ export function CompleteScreen() {
             <Pressable
               key={v}
               onPress={() => actions.setFatiguePick(v)}
-              style={[styles.fatigueDot, state.fatiguePick === v && { backgroundColor: cat.color, borderColor: cat.color }]}
+              style={[styles.fatigueDot, state.fatiguePick === v && { backgroundColor: colors.teal, borderColor: colors.teal }]}
             >
               <Text style={styles.fatigueDotText}>{v}</Text>
             </Pressable>

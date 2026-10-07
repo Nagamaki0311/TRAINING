@@ -1,16 +1,27 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, fonts } from '../../theme/tokens';
+import type { Settings } from '../../data/types';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  dailyTimeCapMinutes: number;
-  onChangeDailyCap: (minutes: number) => void;
+  settings: Settings;
+  onUpdateSettings: (patch: Partial<Settings>) => void;
   onResetAll: () => void;
 }
 
-export function SettingsSheet({ visible, onClose, dailyTimeCapMinutes, onChangeDailyCap, onResetAll }: Props) {
+const REMINDER_STEP_MINUTES = 30;
+const DAY_MINUTES = 24 * 60;
+
+function clockLabel(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+export function SettingsSheet({ visible, onClose, settings, onUpdateSettings, onResetAll }: Props) {
+  const { dailyTimeCapMinutes, reminderEnabled, reminderTimeMinutes } = settings;
+  const shiftReminder = (delta: number) =>
+    onUpdateSettings({ reminderTimeMinutes: (reminderTimeMinutes + delta + DAY_MINUTES) % DAY_MINUTES });
   const [confirming, setConfirming] = useState(false);
   if (!visible) return null;
   return (
@@ -22,15 +33,39 @@ export function SettingsSheet({ visible, onClose, dailyTimeCapMinutes, onChangeD
         <View style={styles.row}>
           <Text style={styles.label}>1日の上限時間</Text>
           <View style={styles.stepper}>
-            <Pressable style={styles.stepBtn} onPress={() => onChangeDailyCap(Math.max(5, dailyTimeCapMinutes - 5))}>
+            <Pressable style={styles.stepBtn} onPress={() => onUpdateSettings({ dailyTimeCapMinutes: Math.max(5, dailyTimeCapMinutes - 5) })}>
               <Text style={styles.stepBtnText}>−</Text>
             </Pressable>
             <Text style={styles.stepValue}>{dailyTimeCapMinutes}分</Text>
-            <Pressable style={styles.stepBtn} onPress={() => onChangeDailyCap(Math.min(60, dailyTimeCapMinutes + 5))}>
+            <Pressable style={styles.stepBtn} onPress={() => onUpdateSettings({ dailyTimeCapMinutes: Math.min(60, dailyTimeCapMinutes + 5) })}>
               <Text style={styles.stepBtnText}>＋</Text>
             </Pressable>
           </View>
         </View>
+
+        <View style={styles.row}>
+          <Text style={styles.label}>毎日のリマインド</Text>
+          <Pressable
+            style={[styles.toggleBtn, reminderEnabled && styles.toggleBtnOn]}
+            onPress={() => onUpdateSettings({ reminderEnabled: !reminderEnabled })}
+          >
+            <Text style={[styles.toggleText, reminderEnabled && styles.toggleTextOn]}>{reminderEnabled ? 'ON' : 'OFF'}</Text>
+          </Pressable>
+        </View>
+        {reminderEnabled && (
+          <View style={styles.row}>
+            <Text style={styles.label}>通知時刻</Text>
+            <View style={styles.stepper}>
+              <Pressable style={styles.stepBtn} onPress={() => shiftReminder(-REMINDER_STEP_MINUTES)}>
+                <Text style={styles.stepBtnText}>−</Text>
+              </Pressable>
+              <Text style={styles.stepValue}>{clockLabel(reminderTimeMinutes)}</Text>
+              <Pressable style={styles.stepBtn} onPress={() => shiftReminder(REMINDER_STEP_MINUTES)}>
+                <Text style={styles.stepBtnText}>＋</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
 
         {!confirming ? (
           <Pressable style={styles.dangerBtn} onPress={() => setConfirming(true)}>
@@ -38,7 +73,7 @@ export function SettingsSheet({ visible, onClose, dailyTimeCapMinutes, onChangeD
           </Pressable>
         ) : (
           <View style={styles.confirmRow}>
-            <Text style={styles.confirmText}>記録・PIN・プログラムをすべて削除します。よろしいですか？</Text>
+            <Text style={styles.confirmText}>記録・PIN・目標をすべて削除します。よろしいですか？</Text>
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
               <Pressable style={styles.cancelBtn} onPress={() => setConfirming(false)}>
                 <Text style={styles.cancelText}>キャンセル</Text>
@@ -93,6 +128,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  toggleBtn: {
+    minWidth: 64,
+    height: 34,
+    paddingHorizontal: 14,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleBtnOn: { borderColor: colors.teal, backgroundColor: 'rgba(0,229,199,.12)' },
+  toggleText: { fontFamily: fonts.labelBold, fontSize: 12, color: colors.textDim2 },
+  toggleTextOn: { color: colors.teal },
   stepBtnText: { color: colors.textDim1, fontSize: 18 },
   stepValue: { fontFamily: fonts.numericBold, fontSize: 18, color: colors.text, minWidth: 48, textAlign: 'center' },
   dangerBtn: {

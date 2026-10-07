@@ -1,22 +1,36 @@
 import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, categoryTokens, fonts } from '../theme/tokens';
-import { useAppState, weekdayOf, todayIso, REST_SECONDS } from '../state/AppState';
+import { categoryOf } from '../data/exercisePool';
+import { exerciseDef, planForToday, todayIso, useAppState } from '../state/AppState';
 import { computeTodayCapacity } from '../engine/capacity';
+import { estimatePlanSeconds } from '../engine/programGenerator';
+import { byNewest, shouldSuggestDeload } from '../engine/progression';
 import { CapacityGauge } from './components/CapacityGauge';
 
 export function HomeScreen() {
   const { state, actions } = useAppState();
-  const weekday = weekdayOf();
-  const todayCategory = state.weekPlan[weekday] ?? null;
   const today = todayIso();
 
   const todaysSessions = useMemo(() => state.sessions.filter((s) => s.date === today), [state.sessions, today]);
   const setsDoneToday = useMemo(() => todaysSessions.reduce((a, s) => a + s.sets.length, 0), [todaysSessions]);
   const minutesDoneToday = useMemo(() => todaysSessions.reduce((a, s) => a + s.durationSec, 0) / 60, [todaysSessions]);
+  const maxSetsInOneCategoryToday = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of todaysSessions) {
+      for (const r of s.sets) {
+        const c = categoryOf(r.exerciseId);
+        if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+      }
+    }
+    return Math.max(0, ...counts.values());
+  }, [todaysSessions]);
 
-  const plannedDay = todayCategory && state.program ? state.program[todayCategory] : null;
-  const plannedTotalSets = plannedDay ? plannedDay.exercises.reduce((a, e) => a + e.sets, 0) : 0;
+  const plan = useMemo(() => planForToday(state), [state.profile, state.targets, state.sessions, state.settings.sessionCountSinceDeload, today]);
+  const plannedTotalSets = plan.reduce((a, e) => a + e.sets, 0);
+  const estMinutes = Math.round(estimatePlanSeconds(plan) / 60);
+  const deload = shouldSuggestDeload(state.settings.sessionCountSinceDeload);
+  const trainedToday = todaysSessions.length > 0;
 
   const capacity = computeTodayCapacity({
     plannedMinutes: state.profile.minutesPerSession,
@@ -24,17 +38,11 @@ export function HomeScreen() {
     dailyTimeCapMinutes: state.settings.dailyTimeCapMinutes,
     setsDoneToday,
     plannedTotalSets: plannedTotalSets || 1,
-    setsDoneTodayForActiveCategory: todaysSessions.filter((s) => s.category === todayCategory).reduce((a, s) => a + s.sets.length, 0),
+    maxSetsInOneCategoryToday,
     fatigueLast3: state.sessions.slice(-3).map((s) => s.fatigue).filter((v): v is number => v !== null),
   });
 
-  const cat = todayCategory ? categoryTokens[todayCategory] : null;
-  const estMinutes = plannedTotalSets ? Math.round((plannedTotalSets * (40 + REST_SECONDS)) / 60) : 0;
-
-  const recent = state.sessions
-    .slice()
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-    .slice(0, 3);
+  const recent = state.sessions.slice().sort(byNewest).slice(0, 3);
 
   return (
     <ScrollView style={styles.wrap} contentContainerStyle={{ paddingBottom: 24 }}>
@@ -59,29 +67,44 @@ export function HomeScreen() {
         />
       </View>
 
-      {cat && plannedDay ? (
-        <Pressable style={[styles.todayCard, { borderColor: cat.color }]} onPress={() => actions.selectCategory(todayCategory!)}>
-          <Text style={styles.todayKanji}>{cat.kanji}</Text>
-          <Text style={[styles.todayKicker, { color: cat.color }]}>TODAY · {cat.en}</Text>
-          <Text style={styles.todayName}>{cat.name}</Text>
-          <View style={{ flexDirection: 'row', gap: 18, marginTop: 14 }}>
-            <Stat label="SETS" value={String(plannedTotalSets)} />
-            <Stat label="TIME" value={`${estMinutes}′`} />
-            <Stat label="LOAD" value="+8%" valueColor={colors.gold} />
-          </View>
-          <Pressable
-            style={[styles.startBtn, { backgroundColor: cat.color }]}
-            onPress={() => actions.startWorkout(todayCategory!)}
-          >
-            <Text style={styles.startText}>START</Text>
-          </Pressable>
-        </Pressable>
-      ) : (
-        <View style={styles.restCard}>
-          <Text style={styles.restTitle}>本日は休養日</Text>
-          <Text style={styles.restSub}>カテゴリから種目を選んで自主トレーニングも可能です</Text>
+      <View style={[styles.todayCard, { borderColor: trainedToday ? colors.hairlineStrong : colors.teal }]}>
+        <Text style={[styles.todayKicker, { color: trainedToday ? colors.textDim3 : colors.teal }]}>
+          {trainedToday ? 'TODAY · 実施済み' : deload ? 'TODAY · ディロード' : 'TODAY'}
+        </Text>
+        <Text style={styles.todayName}>{trainedToday ? '今日のトレーニング完了' : '今日のプラン'}</Text>
+        {trainedToday && <Text style={styles.todaySub}>下は追加で行う場合のプランです（直近の実施量から再計算）。</Text>}
+        <View style={{ flexDirection: 'row', gap: 18, marginTop: 14 }}>
+          <Stat label="SETS" value={String(plannedTotalSets)} />
+          <Stat label="TIME" value={`${estMinutes}′`} />
+          <Stat label="EXERCISES" value={String(plan.length)} />
         </View>
-      )}
+        <View style={{ marginTop: 14, gap: 6 }}>
+          {plan.map((e) => {
+            const def = exerciseDef(e.exerciseId);
+            const c = categoryTokens[def.category];
+            return (
+              <View key={e.exerciseId} style={[styles.planRow, { borderLeftColor: c.color }]}>
+                <Text style={[styles.planCat, { color: c.color }]}>{c.kanji}</Text>
+                <Text style={styles.planName}>{def.name}</Text>
+                <Text style={styles.planSets}>
+                  {e.sets}×{e.targetReps}{def.unit === 'seconds' ? '秒' : ''}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+        <View style={styles.preRow}>
+          <Toggle label="睡眠不足" active={state.preSleepPoor} onPress={actions.togglePreSleep} />
+          <Toggle label="体調不良" active={state.preUnwell} onPress={actions.togglePreUnwell} />
+        </View>
+        {plan.length > 0 ? (
+          <Pressable style={[styles.startBtn, { backgroundColor: colors.teal }]} onPress={actions.startWorkout}>
+            <Text style={styles.startText}>{trainedToday ? '追加で行う' : 'START'}</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.todaySub}>使える種目がありません。</Text>
+        )}
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.historyKicker}>直近の履歴</Text>
@@ -89,22 +112,28 @@ export function HomeScreen() {
           {recent.length === 0 ? (
             <Text style={styles.emptyText}>まだ記録がありません</Text>
           ) : (
-            recent.map((r) => {
-              const c = categoryTokens[r.category];
-              return (
-                <View key={r.id} style={[styles.historyRow, { borderLeftColor: c.color }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.historyName}>{c.name}</Text>
-                    <Text style={styles.historyMeta}>{r.date} · {Math.round(r.durationSec / 60)}分</Text>
-                  </View>
-                  <Text style={[styles.historyRank, { color: c.color }]}>{r.rank}</Text>
+            recent.map((r) => (
+              <View key={r.id} style={[styles.historyRow, { borderLeftColor: colors.teal }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.historyName}>{r.sets.length}セット</Text>
+                  <Text style={styles.historyMeta}>{r.date} · {Math.round(r.durationSec / 60)}分</Text>
                 </View>
-              );
-            })
+                <Text style={[styles.historyRank, { color: colors.teal }]}>{r.rank}</Text>
+              </View>
+            ))
           )}
         </View>
       </View>
     </ScrollView>
+  );
+}
+
+function Toggle({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.toggle, active && styles.toggleActive]}>
+      <View style={[styles.toggleDot, active && styles.toggleDotActive]} />
+      <Text style={[styles.toggleText, active && styles.toggleTextActive]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -144,30 +173,33 @@ const styles = StyleSheet.create({
   rankKicker: { fontFamily: fonts.labelBold, fontSize: 9, letterSpacing: 2, color: colors.textDim3 },
   rankValue: { fontFamily: fonts.numeric, fontSize: 30, color: colors.gold, lineHeight: 34 },
   todayCard: { marginTop: 18, borderRadius: 4, borderWidth: 1, padding: 20, backgroundColor: colors.bgCard, overflow: 'hidden' },
-  todayKanji: {
-    position: 'absolute',
-    right: -14,
-    bottom: -30,
-    fontFamily: fonts.jpBlack,
-    fontSize: 140,
-    color: 'rgba(255,255,255,.05)',
-  },
   todayKicker: { fontFamily: fonts.labelBold, fontSize: 9, letterSpacing: 3 },
   todayName: { fontFamily: fonts.jpBlack, fontSize: 30, color: colors.text, marginTop: 6 },
   statLabel: { fontFamily: fonts.label, fontSize: 9, letterSpacing: 1.5, color: colors.textDim3 },
   statValue: { fontFamily: fonts.numericBold, fontSize: 22, color: colors.text, marginTop: 2 },
-  startBtn: { marginTop: 18, height: 54, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
-  startText: { fontFamily: fonts.jpBlack, fontSize: 17, color: '#0A0505', letterSpacing: 1 },
-  restCard: {
-    marginTop: 18,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    padding: 20,
+  todaySub: { fontFamily: fonts.jpRegular, fontSize: 10, color: colors.textDim2, marginTop: 6 },
+  planRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, backgroundColor: 'rgba(255,255,255,.04)', borderLeftWidth: 2 },
+  planCat: { fontFamily: fonts.jpBlack, fontSize: 13, width: 18, textAlign: 'center' },
+  planName: { flex: 1, fontFamily: fonts.jpBold, fontSize: 12, color: colors.text },
+  planSets: { fontFamily: fonts.numericBold, fontSize: 15, color: colors.textDim1 },
+  preRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  toggle: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
   },
-  restTitle: { fontFamily: fonts.jpBlack, fontSize: 16, color: colors.text },
-  restSub: { fontFamily: fonts.jpRegular, fontSize: 11, color: colors.textDim2, marginTop: 6, textAlign: 'center' },
+  toggleActive: { borderColor: colors.gold, backgroundColor: 'rgba(255,197,61,.12)' },
+  toggleDot: { width: 8, height: 8, borderRadius: 99, backgroundColor: 'rgba(255,255,255,.2)' },
+  toggleDotActive: { backgroundColor: colors.gold },
+  toggleText: { fontFamily: fonts.jp, fontSize: 11, color: colors.textDim2 },
+  toggleTextActive: { color: colors.gold },
+  startBtn: { marginTop: 18, height: 54, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
+  startText: { fontFamily: fonts.jpBlack, fontSize: 17, color: '#04120F', letterSpacing: 1 },
   historyKicker: { fontFamily: fonts.jpBold, fontSize: 10, letterSpacing: 2, color: colors.textDim3, marginBottom: 9 },
   historyRow: {
     flexDirection: 'row',

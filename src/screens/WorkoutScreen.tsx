@@ -29,9 +29,9 @@ export function WorkoutScreen() {
   });
 
   if (!session) return null;
-  const cat = categoryTokens[session.category];
   const ex = session.exercises[session.exIdx];
   const exDef = exerciseDef(ex.exerciseId);
+  const cat = categoryTokens[exDef.category];
   const isLastSetOfExercise = session.setIdx === ex.sets - 1;
   const nextExercise = isLastSetOfExercise ? session.exercises[session.exIdx + 1] : ex;
   const nextIsSameExercise = !isLastSetOfExercise;
