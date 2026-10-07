@@ -24,6 +24,7 @@
 | T-007 | 永続化・PIN認証・タイマー | 高 | 完了 | claude | db.ts（AsyncStorage）・auth.ts（SHA-256+SecureStore PIN、expo-local-authentication生体認証）・timer.ts（タイムスタンプベースのレスト通知）を実装（D-004参照） |
 | T-008 | 敵対的レビュー・仕上げ | 高 | 完了 | general-purpose（reviewer代替） | High2件（最終セット完了時の競合状態）・Medium2件（日付ソートcomparator・永続化エラーハンドリング）をCONFIRMED/PLAUSIBLEで検出、全件修正（D-008参照）。修正後`npx tsc --noEmit`・`expo export --platform ios`で再検証済み |
 | T-009 | 器具統一（懸垂マシン）・種目プール再作成・日次プラン自動生成（15分・毎日・部位バランス） | 高 | 完了 | claude | D-010・D-011。CategoryScreen・週間プランを削除し、HomeScreenを「今日のプラン」に一本化。`tsc`・`expo export --platform ios`は通過、シミュレーションで14日間15分以内・全カテゴリ毎日を確認。敵対的レビュー指摘は修正済み（D-011） |
+| T-011 | 体幹を毎回2枠（曲げ系・安定/ひねり系）にし、経験レベルを中級へ | 中 | 完了 | claude | D-013。14日シミュレーションで体幹は毎日2種目、ぶら下がり系は6日/14日、所要時間は最大14.9分。実機確認待ち |
 | T-010 | 毎日のリマインド通知（22:00仮設定） | 高 | 完了 | claude | D-012。設定画面に ON/OFF・時刻。実機での通知確認は未実施（実機確認待ちの項目はprogress.md参照） |
 
 ## バックログ（未着手・優先度未確定）

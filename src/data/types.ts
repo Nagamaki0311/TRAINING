@@ -5,6 +5,8 @@ export type Equipment = 'bodyweight' | 'pullupbar' | 'dipbars' | 'pushuphandles'
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced';
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 export type Unit = 'reps' | 'seconds';
+/** 体幹のみ。flexion=腹直筋・股関節屈筋で体を曲げる系、stability=腹斜筋・体幹の安定（静止・ひねり）系。D-013参照。 */
+export type CoreFocus = 'flexion' | 'stability';
 
 export interface ExerciseHowTo {
   steps: string[];
@@ -16,6 +18,8 @@ export interface ExerciseDef {
   id: string;
   name: string;
   category: CategoryKey;
+  /** categoryが'core'の種目のみ指定する。日次プランは各フォーカスから1種目ずつ選ぶ。 */
+  coreFocus?: CoreFocus;
   equipment: Equipment[];
   difficulty: Difficulty;
   unit: Unit;

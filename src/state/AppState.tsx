@@ -26,7 +26,7 @@ const SEED_PROFILE: Profile = {
   weightKg: 58,
   birthday: '1998-03-11',
   sex: 'male',
-  experience: 'beginner',
+  experience: 'intermediate',
   equipment: ['bodyweight', 'pullupbar', 'dipbars', 'pushuphandles'],
   minutesPerSession: 15,
 };

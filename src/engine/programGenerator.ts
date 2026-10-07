@@ -4,14 +4,9 @@
 import type { CategoryKey } from '../theme/tokens';
 import { categoryOf, exercisesFor, findExercise } from '../data/exercisePool';
 import { CATEGORY_WEIGHT, SESSION_RULES, WEEKLY_SETS_PER_CATEGORY } from '../data/scienceDefaults';
-import type { ExerciseDef, ExerciseTargets, PlannedExercise, Profile, SessionRecord } from '../data/types';
+import type { CoreFocus, ExerciseDef, ExerciseTargets, PlannedExercise, Profile, SessionRecord } from '../data/types';
 import { applyDeload } from './progression';
 
-/**
- * セッション内の実施順。引く(懸垂系)→押す→脚で握力と肩を休ませ→腕→体幹の順にし、
- * ぶら下がり系の体幹種目が懸垂系の握力を先に使い切らないようにする。
- */
-const CATEGORY_ORDER: CategoryKey[] = ['back', 'chest', 'legs', 'arms', 'core'];
 const DIFFICULTY_RANK = { beginner: 0, intermediate: 1, advanced: 2 } as const;
 
 function pad(n: number): string {
@@ -54,9 +49,22 @@ function lastDoneAt(sessions: SessionRecord[]): Map<string, string> {
   return last;
 }
 
-/** カテゴリ内で、最も長く実施していない種目（未実施は優先、同順位はプール順）を選ぶ。 */
-function pickExercise(category: CategoryKey, profile: Profile, last: Map<string, string>): ExerciseDef | null {
-  const pool = exercisesFor(category, profile.equipment);
+/**
+ * 日次プランの枠。体幹はフォーカス別に2枠（曲げ系・安定/ひねり系）、他は1カテゴリ1枠。
+ * 実施順は、体幹の曲げ系（ぶら下がり種目を含む）を最後にして、握力を後ろへ回す。
+ */
+const SLOT_ORDER: { category: CategoryKey; focus?: CoreFocus }[] = [
+  { category: 'back' },
+  { category: 'chest' },
+  { category: 'legs' },
+  { category: 'arms' },
+  { category: 'core', focus: 'stability' },
+  { category: 'core', focus: 'flexion' },
+];
+
+/** 枠内で、最も長く実施していない種目（未実施は優先、同順位はプール順）を選ぶ。 */
+function pickExercise(category: CategoryKey, focus: CoreFocus | undefined, profile: Profile, last: Map<string, string>): ExerciseDef | null {
+  const pool = exercisesFor(category, profile.equipment).filter((e) => !focus || e.coreFocus === focus);
   const maxRank = DIFFICULTY_RANK[profile.experience] + 1;
   const usable = pool.filter((e) => DIFFICULTY_RANK[e.difficulty] <= maxRank);
   const candidates = usable.length ? usable : pool;
@@ -114,13 +122,15 @@ export function generateDailyPlan({ profile, targets, sessions, today, deload }:
     sets: number;
   }
   const slots: Slot[] = [];
-  for (const category of CATEGORY_ORDER) {
-    const def = pickExercise(category, profile, last);
+  for (const { category, focus } of SLOT_ORDER) {
+    const def = pickExercise(category, focus, profile, last);
     if (def) slots.push({ category, def, targetReps: targets[def.id]?.targetReps ?? def.repRangeLow, sets: 0 });
   }
 
   // 週間目標(中央値×重み)に対して直近の実施が少ないカテゴリほど優先度が高い。
-  const priority = (s: Slot) => (mid * CATEGORY_WEIGHT[s.category]) / (done[s.category] + s.sets + 1);
+  // 同じカテゴリの複数枠（体幹）は、カテゴリ全体の配分済みセット数で比べる。
+  const allocated = (category: CategoryKey) => slots.reduce((a, s) => a + (s.category === category ? s.sets : 0), 0);
+  const priority = (s: Slot) => (mid * CATEGORY_WEIGHT[s.category]) / (done[s.category] + allocated(s.category) + 1);
   let elapsed = 0;
   let count = 0;
   const tryAdd = (s: Slot): boolean => {
@@ -132,9 +142,14 @@ export function generateDailyPlan({ profile, targets, sessions, today, deload }:
     return true;
   };
 
-  // まず全カテゴリへ1セットずつ（偏り防止）、その後は優先度の高いカテゴリから時間予算まで追加する。
-  for (const s of slots.slice().sort((a, b) => priority(b) - priority(a))) tryAdd(s);
-  while (slots.slice().sort((a, b) => priority(b) - priority(a)).some(tryAdd));
+  // 優先度が同じ枠（同カテゴリの体幹2枠など）は、セット数が少ない枠を先にして均等に配分し、
+  // 奇数セットの余りは曲げ系（ぶら下がり種目を含み、筋肥大の刺激が大きい）へ回す。
+  const isFlexion = (s: Slot) => (s.def.coreFocus === 'flexion' ? 1 : 0);
+  const ranked = () => slots.slice().sort((a, b) => priority(b) - priority(a) || a.sets - b.sets || isFlexion(b) - isFlexion(a));
+
+  // まず全枠へ1セットずつ（偏り防止）、その後は優先度の高いカテゴリから時間予算まで追加する。
+  for (const s of ranked()) tryAdd(s);
+  while (ranked().some(tryAdd));
 
   const plan: PlannedExercise[] = slots
     .filter((s) => s.sets > 0)
